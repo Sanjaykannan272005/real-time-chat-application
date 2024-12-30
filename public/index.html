@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Real-Time Chat</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      background-color: #f4f4f9;
+    }
+
+    h1 {
+      color: #333;
+    }
+
+    #username, #room, #message, #roomId {
+      padding: 10px;
+      margin: 10px 0;
+      width: 100%;
+      max-width: 300px;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+    }
+
+    button {
+      padding: 10px 20px;
+      margin: 5px;
+      background-color: #007BFF;
+      color: #fff;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background-color: #0056b3;
+    }
+
+    #chat {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    #messages {
+      width: 100%;
+      max-width: 500px;
+      height: 300px;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+      overflow-y: auto;
+      padding: 10px;
+      background-color: #fff;
+    }
+
+    #messages div {
+      margin-bottom: 10px;
+      padding: 5px;
+      border-radius: 5px;
+      background-color: #e9ecef;
+    }
+
+    #fileInput {
+      margin: 10px 0;
+    }
+
+  </style>
+</head>
+<body>
+  <h1>Real-Time Chat Application</h1>
+  <input id="username" placeholder="Enter your username" />
+  <button id="login">Login</button>
+  <div id="chat" style="display:none;">
+    <input id="roomId" placeholder="Enter room ID or create one" />
+    <button id="create">Create Room</button>
+    <button id="join">Join Room</button>
+    <div id="messages"></div>
+    <input id="message" placeholder="Type your message" />
+    <button id="send">Send</button>
+    <input type="file" id="fileInput" />
+    <button id="sendFile">Send File</button>
+    <button id="leave">Leave Room</button>
+  </div>
+  <script>
+    const ws = new WebSocket('ws://localhost:3000');
+    const usernameInput = document.getElementById('username');
+    const loginButton = document.getElementById('login');
+    const chatDiv = document.getElementById('chat');
+    const roomIdInput = document.getElementById('roomId');
+    const createButton = document.getElementById('create');
+    const joinButton = document.getElementById('join');
+    const messagesDiv = document.getElementById('messages');
+    const messageInput = document.getElementById('message');
+    const sendButton = document.getElementById('send');
+    const leaveButton = document.getElementById('leave');
+    const fileInput = document.getElementById('fileInput');
+    const sendFileButton = document.getElementById('sendFile');
+
+    let username;
+
+    loginButton.addEventListener('click', () => {
+      username = usernameInput.value;
+      ws.send(JSON.stringify({ type: 'login', userId: username }));
+      chatDiv.style.display = 'block';
+    });
+
+    createButton.addEventListener('click', () => {
+      const roomId = roomIdInput.value;
+      ws.send(JSON.stringify({ type: 'create_room', roomId, userId: username }));
+    });
+
+    joinButton.addEventListener('click', () => {
+      const roomId = roomIdInput.value;
+      ws.send(JSON.stringify({ type: 'join_room', roomId, userId: username }));
+    });
+
+    sendButton.addEventListener('click', () => {
+      const content = messageInput.value;
+      ws.send(JSON.stringify({ type: 'send_message', userId: username, content }));
+    });
+
+    sendFileButton.addEventListener('click', () => {
+      const file = fileInput.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = () => {
+          ws.send(
+            JSON.stringify({
+              type: 'send_file',
+              userId: username,
+              fileName: file.name,
+              fileContent: reader.result,
+            })
+          );
+        };
+        reader.readAsDataURL(file);
+      }
+    });
+
+    leaveButton.addEventListener('click', () => {
+      ws.send(JSON.stringify({ type: 'leave_room', userId: username }));
+    });
+
+    ws.onmessage = (event) => {
+      const message = JSON.parse(event.data);
+      const div = document.createElement('div');
+
+      if (message.type === 'message') {
+        div.textContent = `${message.userId}: ${message.content}`;
+      } else if (message.type === 'file') {
+        const link = document.createElement('a');
+        link.href = message.fileContent;
+        link.download = message.fileName;
+        link.textContent = `${message.userId} shared a file: ${message.fileName}`;
+        div.appendChild(link);
+      } else if (message.type === 'notification') {
+        div.textContent = message.content;
+      }
+
+      messagesDiv.appendChild(div);
+    };
+  </script>
+</body>
+</html>
